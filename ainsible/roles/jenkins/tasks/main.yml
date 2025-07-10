@@ -1,0 +1,26 @@
+---
+- name: Add Jenkins APT key
+  apt_key:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io.key
+    state: present
+
+- name: Add Jenkins APT repository
+  apt_repository:
+    repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+    filename: jenkins
+
+- name: Update APT cache
+  apt:
+    update_cache: yes
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: latest
+
+- name: Ensure Jenkins is enabled and started
+  systemd:
+    name: jenkins
+    enabled: yes
+    state: started

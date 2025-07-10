@@ -1,0 +1,29 @@
+---
+- name: Provision DevOps Tools on Target Machines
+  hosts: all
+  become: true
+
+  vars:
+    jenkins_repo: https://pkg.jenkins.io/debian-stable
+    nexus_version: "3.68.0-01"
+    nexus_download_url: "https://download.sonatype.com/nexus/3/nexus-{{ nexus_version }}-unix.tar.gz"
+    dependency_check_version: "8.4.0"
+
+  pre_tasks:
+    - name: Update APT cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+      tags: update
+
+  roles:
+    - { role: java, tags: java }
+    - { role: docker, tags: docker }
+    - { role: jenkins, tags: jenkins }
+    - { role: maven, tags: maven }
+    - { role: nexus, tags: nexus }
+    - { role: trivy, tags: trivy }
+    - { role: owasp, tags: owasp }
+    - { role: sonarqube, tags: sonarqube }
+    - { role: prometheus, tags: prometheus }
+    - { role: grafana, tags: grafana }

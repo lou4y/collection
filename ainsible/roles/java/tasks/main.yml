@@ -1,0 +1,18 @@
+---
+- name: Install OpenJDK 17
+  apt:
+    name: openjdk-17-jdk
+    state: present
+    update_cache: yes
+
+- name: Ensure JAVA_HOME is set system-wide
+  lineinfile:
+    path: /etc/environment
+    regexp: '^JAVA_HOME='
+    line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+    create: yes
+
+- name: Reload environment variables
+  shell: source /etc/environment
+  args:
+    executable: /bin/bash
