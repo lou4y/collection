@@ -1,82 +1,27 @@
----
-- name: Install Java (dependency for Nexus)
-  apt:
-    name: openjdk-17-jdk
-    state: present
-    update_cache: yes
-
-- name: Create nexus user
-  user:
-    name: nexus
-    system: yes
-    shell: /bin/bash
-    create_home: no
-
-- name: Download Nexus archive
+- name: Download Nexus tarball
   get_url:
     url: "{{ nexus_download_url }}"
     dest: /tmp/nexus.tar.gz
     mode: '0644'
 
-- name: Extract Nexus
+- name: Extract Nexus archive
   unarchive:
     src: /tmp/nexus.tar.gz
-    dest: /opt/
+    dest: "{{ nexus_install_dir }}"
     remote_src: yes
-    creates: /opt/nexus-{{ nexus_version }}
 
-- name: Symlink nexus directory
+- name: Set Nexus extracted directory
+  set_fact:
+    nexus_extracted_path: "{{ nexus_install_dir }}/nexus-{{ nexus_version }}"
+
+- name: Make nexus startup script executable
   file:
-    src: /opt/nexus-{{ nexus_version }}
-    dest: /opt/nexus
-    state: link
+    path: "{{ nexus_extracted_path }}/bin/nexus"
+    mode: '0755'
 
-- name: Change ownership of nexus directories
-  file:
-    path: "/opt/nexus*"
-    owner: nexus
-    group: nexus
-    recurse: yes
-
-- name: Create Nexus data directory
-  file:
-    path: /opt/sonatype-work
-    state: directory
-    owner: nexus
-    group: nexus
-
-- name: Configure nexus to run as nexus user
-  lineinfile:
-    path: /opt/nexus/bin/nexus.rc
-    regexp: '^#run_as_user='
-    line: 'run_as_user="nexus"'
-
-- name: Create systemd service file for Nexus
-  copy:
-    dest: /etc/systemd/system/nexus.service
-    content: |
-      [Unit]
-      Description=nexus service
-      After=network.target
-
-      [Service]
-      Type=forking
-      LimitNOFILE=65536
-      ExecStart=/opt/nexus/bin/nexus start
-      ExecStop=/opt/nexus/bin/nexus stop
-      User=nexus
-      Restart=on-abort
-
-      [Install]
-      WantedBy=multi-user.target
-    mode: '0644'
-
-- name: Reload systemd daemon
-  systemd:
-    daemon_reload: yes
-
-- name: Enable and start Nexus service
-  systemd:
-    name: nexus
-    enabled: yes
-    state: started
+- name: Start Nexus server
+  command: "{{ nexus_extracted_path }}/bin/nexus start"
+  args:
+    chdir: "{{ nexus_extracted_path }}"
+  async: 30
+  poll: 0

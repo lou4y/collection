@@ -1,36 +1,19 @@
-# roles/maven/tasks/main.yml
 ---
-
-- name: Install required dependencies
+- name: Update apt cache
   apt:
-    name: tar
-    state: present
     update_cache: yes
 
-- name: Download Maven archive
-  get_url:
-    url: "{{ maven_url }}"
-    dest: "/tmp/apache-maven-{{ maven_version }}-bin.tar.gz"
-    mode: '0644'
+- name: Install Maven package
+  apt:
+    name: maven
+    state: present
 
-- name: Extract Maven archive
-  unarchive:
-    src: "/tmp/apache-maven-{{ maven_version }}-bin.tar.gz"
-    dest: /opt/
-    remote_src: yes
-    creates: "{{ maven_install_dir }}"
+- name: Ensure Maven is installed and check version
+  command: mvn -version
+  register: maven_version_output
+  changed_when: false
 
-- name: Rename extracted folder to maven
-  command: mv /opt/apache-maven-{{ maven_version }} "{{ maven_install_dir }}"
-  args:
-    creates: "{{ maven_install_dir }}"
-  register: mv_maven
-  changed_when: mv_maven.rc == 0
+- name: Show installed Maven version
+  debug:
+    msg: "{{ maven_version_output.stdout }}"
 
-- name: Set environment variables for Maven
-  copy:
-    dest: /etc/profile.d/maven.sh
-    content: |
-      export M2_HOME={{ maven_install_dir }}
-      export PATH=${M2_HOME}/bin:${PATH}
-    mode: '0755'
