@@ -25,6 +25,7 @@
   failed_when: "'already exists' not in create_user_result.stderr and create_user_result.rc != 0"
 
 - name: Create sonar PostgreSQL database
+  become: true
   become_user: postgres
   postgresql_db:
     name: "{{ sonar_db_name }}"
@@ -32,6 +33,7 @@
     lc_collate: en_US.UTF-8
     lc_ctype: en_US.UTF-8
     owner: "{{ sonar_db_user }}"
+
 
 - name: Download SonarQube
   get_url:
