@@ -17,11 +17,12 @@
     state: started
 
 - name: Create sonar PostgreSQL user
-  become_user: postgres
-  postgresql_user:
-    name: "{{ sonar_db_user }}"
-    password: "{{ sonar_db_pass }}"
-    role_attr_flags: LOGIN
+  command: >
+    sudo -u postgres psql -c "CREATE ROLE {{ sonar_db_user }} WITH LOGIN ENCRYPTED PASSWORD '{{ sonar_db_pass }}';"
+  become: true
+  changed_when: false
+  register: create_user_result
+  failed_when: "'already exists' not in create_user_result.stderr and create_user_result.rc != 0"
 
 - name: Create sonar PostgreSQL database
   become_user: postgres
