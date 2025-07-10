@@ -1,84 +1,182 @@
----
 - name: Install required packages
   apt:
     name:
+      - unzip
       - openjdk-17-jdk
-      - unzip
+      - postgresql
+      - postgresql-common
       - wget
-      - curl
-      - gnupg
-      - zip
-      - unzip
+      - ufw
     state: present
     update_cache: yes
 
-- name: Create sonarqube user
-  user:
-    name: sonarqube
-    system: yes
-    shell: /bin/bash
-    create_home: no
+- name: Enable and start PostgreSQL
+  systemd:
+    name: postgresql
+    enabled: yes
+    state: started
 
-- name: Define SonarQube version and URL
-  set_fact:
-    sonarqube_version: "10.3.1.74502"
-    sonarqube_url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip"
+- name: Create sonar PostgreSQL user
+  become_user: postgres
+  postgresql_user:
+    name: "{{ sonar_db_user }}"
+    password: "{{ sonar_db_pass }}"
+    role_attr_flags: LOGIN
+
+- name: Create sonar PostgreSQL database
+  become_user: postgres
+  postgresql_db:
+    name: "{{ sonar_db_name }}"
+    encoding: UTF8
+    lc_collate: en_US.UTF-8
+    lc_ctype: en_US.UTF-8
+    owner: "{{ sonar_db_user }}"
 
 - name: Download SonarQube
   get_url:
-    url: "{{ sonarqube_url }}"
+    url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonar_version }}.zip"
     dest: "/tmp/sonarqube.zip"
-    mode: '0644'
 
 - name: Extract SonarQube
   unarchive:
-    src: /tmp/sonarqube.zip
-    dest: /opt/
+    src: "/tmp/sonarqube.zip"
+    dest: "/opt/"
     remote_src: yes
-    creates: "/opt/sonarqube-{{ sonarqube_version }}"
 
-- name: Symlink sonarqube directory
-  file:
-    src: "/opt/sonarqube-{{ sonarqube_version }}"
-    dest: /opt/sonarqube
-    state: link
-    force: yes
+- name: Rename SonarQube directory
+  command: mv "/opt/sonarqube-{{ sonar_version }}" "{{ sonar_dir }}"
+  args:
+    creates: "{{ sonar_dir }}"
 
-- name: Change ownership of sonarqube directory
+- name: Add system user for SonarQube
+  user:
+    name: "{{ sonar_user }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Set permissions for SonarQube
   file:
-    path: /opt/sonarqube*
-    owner: sonarqube
-    group: sonarqube
+    path: "{{ sonar_dir }}"
+    owner: "{{ sonar_user }}"
+    group: "{{ sonar_user }}"
     recurse: yes
 
-- name: Create systemd service file for SonarQube
+- name: Configure sonar.properties
+  blockinfile:
+    path: "{{ sonar_dir }}/conf/sonar.properties"
+    block: |
+      sonar.jdbc.username={{ sonar_db_user }}
+      sonar.jdbc.password={{ sonar_db_pass }}
+      sonar.jdbc.url=jdbc:postgresql://localhost:5432/{{ sonar_db_name }}
+      sonar.web.javaAdditionalOpts=-server
+      sonar.web.host=0.0.0.0
+      sonar.web.port=9000
+
+- name: Tune sysctl for SonarQube
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { key: "vm.max_map_count", value: "524288" }
+    - { key: "fs.file-max", value: "131072" }
+
+- name: Set security limits
+  copy:
+    dest: /etc/security/limits.d/99-sonarqube.conf
+    content: |
+      sonarqube   -   nofile   131072
+      sonarqube   -   nproc    8192
+
+- name: Allow SonarQube port through UFW
+  ufw:
+    rule: allow
+    port: "9000"
+    proto: tcp
+
+- name: Ensure SSH is allowed (optional)
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: allow
+
+- name: Download SonarScanner
+  get_url:
+    url: "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-{{ scanner_version }}-linux-x64.zip"
+    dest: /tmp/sonar-scanner.zip
+
+- name: Extract SonarScanner
+  unarchive:
+    src: /tmp/sonar-scanner.zip
+    dest: /opt/
+    remote_src: yes
+
+- name: Rename SonarScanner directory
+  command: mv "/opt/sonar-scanner-{{ scanner_version }}-linux-x64" "/opt/sonarscanner"
+  args:
+    creates: "/opt/sonarscanner"
+
+- name: Configure sonar-scanner.properties
+  lineinfile:
+    path: /opt/sonarscanner/conf/sonar-scanner.properties
+    regexp: "^sonar.host.url="
+    line: "sonar.host.url={{ sonar_url }}"
+    insertafter: EOF
+    create: yes
+
+- name: Add sonar-scanner to system path
+  file:
+    src: /opt/sonarscanner/bin/sonar-scanner
+    dest: /usr/local/bin/sonar-scanner
+    state: link
+
+- name: Make sonar-scanner executable
+  file:
+    path: /opt/sonarscanner/bin/sonar-scanner
+    mode: '0755'
+
+- name: Create SonarQube systemd service
   copy:
     dest: /etc/systemd/system/sonarqube.service
     content: |
       [Unit]
       Description=SonarQube service
-      After=network.target
+      After=syslog.target network.target
 
       [Service]
-      Type=simple
-      ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
-      ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
-      User=sonarqube
-      Group=sonarqube
+      Type=forking
+      ExecStart={{ sonar_dir }}/bin/linux-x86-64/sonar.sh start
+      ExecStop={{ sonar_dir }}/bin/linux-x86-64/sonar.sh stop
+      User={{ sonar_user }}
+      Group={{ sonar_user }}
+      PermissionsStartOnly=true
       Restart=always
-      LimitNOFILE=65536
-      LimitNPROC=4096
+      StandardOutput=syslog
+      LimitNOFILE=131072
+      LimitNPROC=8192
+      TimeoutStartSec=5
+      SuccessExitStatus=143
 
       [Install]
       WantedBy=multi-user.target
-    mode: '0644'
 
-- name: Reload systemd daemon
+- name: Reload systemd
   systemd:
     daemon_reload: yes
 
-- name: Enable and start SonarQube service
+- name: Enable SonarQube service
   systemd:
     name: sonarqube
     enabled: yes
+
+- name: Start SonarQube service
+  systemd:
+    name: sonarqube
     state: started
