@@ -1,9 +1,5 @@
+# roles/maven/tasks/main.yml
 ---
-- name: Define Maven version
-  set_fact:
-    maven_version: "3.9.4"
-    maven_url: "https://dlcdn.apache.org/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz"
-    maven_install_dir: "/opt/maven"
 
 - name: Install required dependencies
   apt:
@@ -27,7 +23,7 @@
 - name: Rename extracted folder to maven
   command: mv /opt/apache-maven-{{ maven_version }} "{{ maven_install_dir }}"
   args:
-    removes: "{{ maven_install_dir }}"
+    creates: "{{ maven_install_dir }}"
   register: mv_maven
   changed_when: mv_maven.rc == 0
 
@@ -38,8 +34,3 @@
       export M2_HOME={{ maven_install_dir }}
       export PATH=${M2_HOME}/bin:${PATH}
     mode: '0755'
-
-- name: Load Maven environment variables
-  shell: source /etc/profile.d/maven.sh
-  args:
-    executable: /bin/bash
