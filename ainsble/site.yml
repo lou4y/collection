@@ -11,7 +11,6 @@
     nexus_user: "nexus"
     nexus_home: "/opt/nexus"
     nexus_data_dir: "/opt/sonatype-work"
-    dependency_check_version: "8.4.0"
     sonar_version: "25.2.0.102705"
     sonar_user: "sonarqube"
     sonar_db_user: "sonaruser"
