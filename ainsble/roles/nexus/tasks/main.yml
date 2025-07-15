@@ -54,18 +54,6 @@
     mode: '0644'
     force: no  # Only create if file doesn't exist
 
-
-- name: Set nexus JVM memory options
-  copy:
-    dest: "{{ nexus_install_dir }}/bin/nexus.vmoptions"
-    content: |
-      -Xms1024m
-      -Xmx1024m
-      -XX:MaxDirectMemorySize=1024m
-    owner: nexus
-    group: nexus
-    mode: '0644'
-
 - name: Ensure application-host is set in nexus.properties
   lineinfile:
     path: "{{ nexus_data_dir }}/nexus3/etc/nexus.properties"
