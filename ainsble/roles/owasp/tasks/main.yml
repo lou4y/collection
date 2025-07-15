@@ -7,7 +7,7 @@
 
 - name: Download OWASP Dependency-Check CLI
   get_url:
-    url: "https://github.com/jeremylong/DependencyCheck/releases/download/v{{ dependency_check_version }}/dependency-check-${dependency_check_version}-release.zip"
+    url: "https://github.com/jeremylong/DependencyCheck/releases/download/v{{ dependency_check_version }}/dependency-check-{{ dependency_check_version }}-release.zip"
     dest: /tmp/dependency-check.zip
     mode: '0644'
 
