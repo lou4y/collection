@@ -19,9 +19,32 @@
     path: "{{ nexus_extracted_path }}/bin/nexus"
     mode: '0755'
 
-- name: Start Nexus server
-  command: "{{ nexus_extracted_path }}/bin/nexus start"
-  args:
-    chdir: "{{ nexus_extracted_path }}"
-  async: 30
-  poll: 0
+- name: Create systemd service file for Nexus
+  copy:
+    dest: /etc/systemd/system/nexus.service
+    content: |
+      [Unit]
+      Description=Nexus Repository Manager
+      After=network.target
+
+      [Service]
+      Type=forking
+      ExecStart={{ nexus_extracted_path }}/bin/nexus start
+      ExecStop={{ nexus_extracted_path }}/bin/nexus stop
+      User={{ nexus_user }}
+      Restart=on-abort
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+  mode: '0644'
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start Nexus service
+  systemd:
+    name: nexus
+    enabled: yes
+    state: started
