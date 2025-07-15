@@ -1,0 +1,23 @@
+- name: Add Helm apt repository
+  apt_repository:
+    repo: "deb https://baltocdn.com/helm/stable/debian/ all main"
+    state: present
+    filename: 'helm'
+  tags: helm
+
+- name: Add Helm repo GPG key
+  apt_key:
+    url: https://baltocdn.com/helm/signing.asc
+    state: present
+  tags: helm
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  tags: helm
+
+- name: Install Helm package
+  apt:
+    name: helm
+    state: present
+  tags: helm
