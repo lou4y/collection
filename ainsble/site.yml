@@ -22,7 +22,7 @@
     sonar_url: "http://127.0.0.1:9000"
     prometheus_version: "2.45.0"
     prometheus_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
-    dependency_check_version: "8.4.0"
+    dependency_check_version: "12.1.0"
 
   pre_tasks:
     - name: Update APT cache and upgrade packages
