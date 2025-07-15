@@ -1,0 +1,30 @@
+---
+- name: Create OWASP install directory
+  file:
+    path: /opt/owasp
+    state: directory
+    mode: '0755'
+
+- name: Download OWASP Dependency-Check CLI
+  get_url:
+    url: "https://github.com/jeremylong/DependencyCheck/releases/download/v{{ dependency_check_version }}/dependency-check-${dependency_check_version}-release.zip"
+    dest: /tmp/dependency-check.zip
+    mode: '0644'
+
+- name: Unzip Dependency-Check
+  unarchive:
+    src: /tmp/dependency-check.zip
+    dest: /opt/owasp/
+    remote_src: yes
+
+- name: Create symlink for dependency-check.sh
+  file:
+    src: "/opt/owasp/dependency-check/bin/dependency-check.sh"
+    dest: /usr/local/bin/dependency-check
+    state: link
+    mode: '0755'
+
+- name: Ensure dependency-check is executable
+  file:
+    path: "/opt/owasp/dependency-check/bin/dependency-check.sh"
+    mode: '0755'
