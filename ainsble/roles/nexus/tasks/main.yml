@@ -45,11 +45,15 @@
     - "{{ nexus_install_dir }}"
     - "{{ nexus_data_dir }}"
 
-- name: Configure nexus.rc to run as nexus user
-  lineinfile:
-    path: "{{ nexus_install_dir }}/bin/nexus.rc"
-    regexp: '^#?run_as_user='
-    line: 'run_as_user="nexus"'
+- name: Create nexus.rc if missing and set run_as_user
+  copy:
+    dest: "{{ nexus_install_dir }}/bin/nexus.rc"
+    content: 'run_as_user="nexus"'
+    owner: nexus
+    group: nexus
+    mode: '0644'
+    force: no  # Only create if file doesn't exist
+
 
 - name: Set nexus JVM memory options
   copy:
