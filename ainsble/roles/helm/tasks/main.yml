@@ -1,23 +1,10 @@
-- name: Add Helm apt repository
-  apt_repository:
-    repo: "deb https://baltocdn.com/helm/stable/debian/ all main"
-    state: present
-    filename: 'helm'
+- name: Download Helm install script
+  get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get_helm.sh
+    mode: '0700'
   tags: helm
 
-- name: Add Helm repo GPG key
-  apt_key:
-    url: https://baltocdn.com/helm/signing.asc
-    state: present
-  tags: helm
-
-- name: Update apt cache
-  apt:
-    update_cache: yes
-  tags: helm
-
-- name: Install Helm package
-  apt:
-    name: helm
-    state: present
+- name: Run Helm install script
+  command: /tmp/get_helm.sh
   tags: helm
