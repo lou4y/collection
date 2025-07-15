@@ -66,11 +66,16 @@
     group: nexus
     mode: '0644'
 
-- name: Set application-host in nexus.properties
+- name: Ensure application-host is set in nexus.properties
   lineinfile:
     path: "{{ nexus_data_dir }}/nexus3/etc/nexus.properties"
     regexp: '^#?application-host='
     line: 'application-host=127.0.0.1'
+    create: yes
+    mode: '0644'
+    owner: nexus
+    group: nexus
+
 
 - name: Create systemd service file for Nexus
   copy:
