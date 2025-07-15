@@ -1,29 +1,25 @@
----
-- name: Define Trivy version
-  set_fact:
-    trivy_version: "0.46.2"
-
 - name: Download Trivy binary
   get_url:
     url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.tar.gz"
-    dest: "/tmp/trivy.tar.gz"
+    dest: /tmp/trivy.tar.gz
     mode: '0644'
 
-- name: Extract Trivy binary
-  unarchive:
-    src: /tmp/trivy.tar.gz
-    dest: /tmp/
-    remote_src: yes
-    creates: "/tmp/trivy"
-
-- name: Move Trivy to /usr/local/bin
-  copy:
-    src: /tmp/trivy
-    dest: /usr/local/bin/trivy
-    remote_src: yes
+- name: Create directory for Trivy
+  file:
+    path: /opt/trivy
+    state: directory
     mode: '0755'
 
-- name: Remove extracted trivy temp files
+- name: Extract Trivy
+  unarchive:
+    src: /tmp/trivy.tar.gz
+    dest: /opt/trivy/
+    remote_src: yes
+
+- name: Link Trivy binary globally
   file:
-    path: /tmp/trivy
-    state: absent
+    src: /opt/trivy/trivy
+    dest: /usr/local/bin/trivy
+    state: link
+    mode: '0755'
+
