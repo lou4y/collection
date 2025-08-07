@@ -1,18 +1,3 @@
-- name: Ensure nexus user exists
-  user:
-    name: nexus
-    home: "{{ nexus_install_dir }}"
-    shell: /bin/bash
-    create_home: no
-    system: yes
-  ignore_errors: yes
-
-- name: Set ulimit for nexus user
-  copy:
-    dest: /etc/security/limits.d/nexus.conf
-    content: |
-      nexus - nofile 65536
-
 - name: Download Nexus tarball
   get_url:
     url: "{{ nexus_download_url }}"
@@ -22,74 +7,21 @@
 - name: Extract Nexus archive
   unarchive:
     src: /tmp/nexus.tar.gz
-    dest: /tmp/
+    dest: "{{ nexus_install_dir }}"
     remote_src: yes
 
-- name: Move Nexus directory to install path
-  command: mv /tmp/nexus-{{ nexus_version }} {{ nexus_install_dir }}
-  args:
-    removes: /tmp/nexus-{{ nexus_version }}
+- name: Set Nexus extracted directory
+  set_fact:
+    nexus_extracted_path: "{{ nexus_install_dir }}/nexus-{{ nexus_version }}"
 
-- name: Move sonatype-work directory to data path
-  command: mv /tmp/sonatype-work {{ nexus_data_dir }}
-  args:
-    removes: /tmp/sonatype-work
-
-- name: Change ownership of nexus and data directories
+- name: Make nexus startup script executable
   file:
-    path: "{{ item }}"
-    owner: nexus
-    group: nexus
-    recurse: yes
-  loop:
-    - "{{ nexus_install_dir }}"
-    - "{{ nexus_data_dir }}"
+    path: "{{ nexus_extracted_path }}/bin/nexus"
+    mode: '0755'
 
-- name: Create nexus.rc if missing and set run_as_user
-  copy:
-    dest: "{{ nexus_install_dir }}/bin/nexus.rc"
-    content: 'run_as_user="nexus"'
-    owner: nexus
-    group: nexus
-    mode: '0644'
-    force: no  # Only create if file doesn't exist
-
-- name: Ensure application-host is set in nexus.properties
-  lineinfile:
-    path: "{{ nexus_data_dir }}/nexus3/etc/nexus.properties"
-    regexp: '^#?application-host='
-    line: 'application-host=127.0.0.1'
-    create: yes
-    mode: '0644'
-    owner: nexus
-    group: nexus
-
-
-- name: Create systemd service file for Nexus
-  copy:
-    dest: /etc/systemd/system/nexus.service
-    content: |
-      [Unit]
-      Description=nexus service
-      After=network.target
-
-      [Service]
-      Type=forking
-      LimitNOFILE=65536
-      ExecStart={{ nexus_install_dir }}/bin/nexus start
-      ExecStop={{ nexus_install_dir }}/bin/nexus stop
-      User=nexus
-      Restart=on-abort
-
-      [Install]
-      WantedBy=multi-user.target
-    mode: '0644'
-
-- name: Reload systemd daemon
-  command: systemctl daemon-reload
-
-- name: Enable and start nexus service
-  systemd:
-    name: nexus
-    enabled: yes
-    state: started
+- name: Start Nexus server
+  command: "{{ nexus_extracted_path }}/bin/nexus start"
+  args:
+    chdir: "{{ nexus_extracted_path }}"
+  async: 30
+  poll: 0
