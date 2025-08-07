@@ -7,21 +7,15 @@
 - name: Extract Nexus archive
   unarchive:
     src: /tmp/nexus.tar.gz
-    dest: "{{ nexus_install_dir }}"
+    dest: /tmp/
     remote_src: yes
 
-- name: Set Nexus extracted directory
-  set_fact:
-    nexus_extracted_path: "{{ nexus_install_dir }}/nexus-{{ nexus_version }}"
-
-- name: Make nexus startup script executable
-  file:
-    path: "{{ nexus_extracted_path }}/bin/nexus"
-    mode: '0755'
-
-- name: Start Nexus server
-  command: "{{ nexus_extracted_path }}/bin/nexus start"
+- name: Move Nexus directory to install path
+  command: mv /tmp/nexus-{{ nexus_version }} {{ nexus_install_dir }}
   args:
-    chdir: "{{ nexus_extracted_path }}"
-  async: 30
-  poll: 0
+    removes: /tmp/nexus-{{ nexus_version }}
+
+- name: Move sonatype-work directory to data path
+  command: mv /tmp/sonatype-work {{ nexus_data_dir }}
+  args:
+    removes: /tmp/sonatype-work
