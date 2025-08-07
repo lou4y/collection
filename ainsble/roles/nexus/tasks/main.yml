@@ -1,21 +1,87 @@
-- name: Download Nexus tarball
-  get_url:
+- name: Ensure Nexus user and group exist
+  ansible.builtin.user:
+    name: "{{ nexus_user }}"
+    shell: /bin/bash
+    home: "{{ nexus_install_dir }}"
+    create_home: yes
+
+- name: Create Nexus installation directory
+  ansible.builtin.file:
+    path: "{{ nexus_install_dir }}"
+    state: directory
+    owner: "{{ nexus_user }}"
+    group: "{{ nexus_group }}"
+    mode: '0755'
+
+- name: Download Nexus tar.gz archive
+  ansible.builtin.get_url:
     url: "{{ nexus_download_url }}"
-    dest: /tmp/nexus.tar.gz
+    dest: "/tmp/{{ nexus_bundle_name }}"
+    mode: '0644'
+    
+- name: Extract Nexus archive
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ nexus_bundle_name }}"
+    dest: "{{ nexus_install_dir }}"
+    remote_src: yes
+    extra_opts: [--keep-directory-symlink]
+    owner: "{{ nexus_user }}"
+    group: "{{ nexus_group }}"
+
+- name: Create symlink to nexus directory
+  ansible.builtin.file:
+    src: "{{ nexus_extracted_dir }}"
+    dest: "{{ nexus_symlink_dir }}"
+    state: link
+    force: yes
+
+- name: Set run_as_user in nexus.rc
+  ansible.builtin.lineinfile:
+    path: "{{ nexus_symlink_dir }}/bin/nexus.rc"
+    regexp: '^#?run_as_user='
+    line: "run_as_user={{ nexus_user }}"
+    create: yes
+    owner: "{{ nexus_user }}"
+    group: "{{ nexus_group }}"
+
+- name: Create systemd service file for Nexus
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/{{ nexus_service_name }}.service
+    content: |
+      [Unit]
+      Description=Nexus Repository Manager
+      After=network.target
+
+      [Service]
+      Type=forking
+      LimitNOFILE=65536
+      ExecStart={{ nexus_symlink_dir }}/bin/nexus start
+      ExecStop={{ nexus_symlink_dir }}/bin/nexus stop
+      User={{ nexus_user }}
+      Restart=on-abort
+      TimeoutSec=600
+
+      [Install]
+      WantedBy=multi-user.target
     mode: '0644'
 
-- name: Extract Nexus archive
-  unarchive:
-    src: /tmp/nexus.tar.gz
-    dest: /tmp/
-    remote_src: yes
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
 
-- name: Move Nexus directory to install path
-  command: mv /tmp/nexus-{{ nexus_version }} {{ nexus_install_dir }}
-  args:
-    removes: /tmp/nexus-{{ nexus_version }}
+- name: Enable Nexus service
+  ansible.builtin.systemd:
+    name: "{{ nexus_service_name }}"
+    enabled: yes
 
-- name: Move sonatype-work directory to data path
-  command: mv /tmp/sonatype-work {{ nexus_data_dir }}
-  args:
-    removes: /tmp/sonatype-work
+- name: Start Nexus service
+  ansible.builtin.systemd:
+    name: "{{ nexus_service_name }}"
+    state: started
+
+- name: Wait for Nexus to become available
+  ansible.builtin.wait_for:
+    path: "{{ nexus_log_file }}"
+    search_regex: "Started Sonatype Nexus"
+    delay: 10
+    timeout: 120
